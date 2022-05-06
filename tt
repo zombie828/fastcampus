@@ -1,0 +1,53 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('prepare') {
+            steps {
+                 echo 'prepare'
+                 git branch: "${BRANCH}", credentialsId: "GIT_ACCOUNT", url: 'https://github.com/zombie828/jenkins-test'
+                 sh  'ls -al'
+            }
+        }
+        stage('build gradle') {
+            steps {
+                sh 'sudo chmod 755 ./gradlew'
+                sh './gradlew clean build'
+                sh 'ls -al ./build'
+            }
+            post {
+                success {
+                    echo 'gradle build success'
+                }
+
+                failure {
+                    echo 'gradle build failed'
+                }
+            }
+        }
+
+        stage('deploy') {
+            steps {
+                sh 'mkdir deploy'
+                sh 'mv build/libs/*.jar deploy'
+                sh 'mv appspec.yml deploy'
+                sh 'mv deploy.sh deploy'
+
+                dir('deploy') {
+                    sh 'ls -al'
+                    sh 'zip buildfile.zip ./*'
+                    sh 'aws s3 sync ./*.zip s3://code-deploy-test3212 --delete --profile default'
+                }
+            }
+            post {
+                success {
+                    echo 'deploy success'
+                }
+
+                failure {
+                    echo 'deploy build failed'
+                }
+            }
+        }
+    }
+}
